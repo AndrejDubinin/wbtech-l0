@@ -1,0 +1,45 @@
+services:
+  postgres:
+    container_name: wbtech-l0-pg
+    image: postgres:16.2
+    restart: always
+    environment:
+      POSTGRES_DB: ${POSTGRES_DB}
+      POSTGRES_USER: ${POSTGRES_USER}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
+    ports:
+      - ${POSTGRES_HOST_PORT}:5432
+    healthcheck:
+      test:
+        [
+          "CMD",
+          "pg_isready",
+          "-q",
+          "-d",
+          "${POSTGRES_DB}",
+          "-U",
+          "${POSTGRES_USER}",
+        ]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  migration:
+    container_name: wbtech-l0-goose
+    image: gomicro/goose
+    platform: linux/amd64
+    volumes:
+      - ../../migrations:/migrations
+    depends_on:
+      postgres:
+        condition: service_healthy
+    environment:
+      POSTGRES_DB: ${POSTGRES_DB}
+      POSTGRES_USER: ${POSTGRES_USER}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
+    command:
+      [
+        "sh",
+        "-c",
+        'goose -dir /migrations postgres "postgres://$POSTGRES_USER:$POSTGRES_PASSWORD@postgres:5432/$POSTGRES_DB" up',
+      ]
