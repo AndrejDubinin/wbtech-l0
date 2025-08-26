@@ -43,3 +43,43 @@ services:
         "-c",
         'goose -dir /migrations postgres "postgres://$POSTGRES_USER:$POSTGRES_PASSWORD@postgres:5432/$POSTGRES_DB" up',
       ]
+
+  kafka-ui:
+    container_name: wbtech-l0-kafka-ui
+    image: provectuslabs/kafka-ui:latest
+    ports:
+      - ${KAFKA_UI_PORT}:8080
+    environment:
+      KAFKA_CLUSTERS_0_NAME: local
+      KAFKA_CLUSTERS_0_BOOTSTRAPSERVERS: kafka0:29092
+      DYNAMIC_CONFIG_ENABLED: "true"
+
+  kafka0:
+    container_name: wbtech-l0-kafka
+    image: confluentinc/cp-kafka:7.2.15.arm64
+    ports:
+      - ${KAFKA_BROKER_PORT}:9092
+    environment:
+      KAFKA_NODE_ID: 1
+      KAFKA_LISTENER_SECURITY_PROTOCOL_MAP: PLAINTEXT:PLAINTEXT,CONTROLLER:PLAINTEXT,PLAINTEXT_HOST:PLAINTEXT
+      KAFKA_ADVERTISED_LISTENERS: PLAINTEXT://kafka0:29092,PLAINTEXT_HOST://localhost:${KAFKA_BROKER_PORT}
+      KAFKA_LISTENERS: PLAINTEXT://kafka0:29092,CONTROLLER://kafka0:29093,PLAINTEXT_HOST://:${KAFKA_BROKER_PORT}
+      KAFKA_CONTROLLER_LISTENER_NAMES: "CONTROLLER"
+      KAFKA_OFFSETS_TOPIC_REPLICATION_FACTOR: 1
+      KAFKA_TRANSACTION_STATE_LOG_MIN_ISR: 1
+      KAFKA_TRANSACTION_STATE_LOG_REPLICATION_FACTOR: 1
+      KAFKA_CONTROLLER_QUORUM_VOTERS: "1@kafka0:29093"
+      KAFKA_PROCESS_ROLES: "broker,controller"
+      KAFKA_LOG_DIRS: "/tmp/kraft-combined-logs"
+    volumes:
+      - ./kafka/scripts/run_workaround.sh:/tmp/run_workaround.sh
+    command: "bash -c '/tmp/run_workaround.sh && /etc/confluent/docker/run'"
+
+  kafka-init-topics:
+    container_name: wbtech-l0-init-topics
+    image: confluentinc/cp-kafka:7.2.15.arm64
+    depends_on:
+      - kafka0
+    command: "bash -c 'echo Waiting for Kafka to be ready... && \
+      cub kafka-ready -b kafka0:29092 1 30 && \
+      kafka-topics --create --topic ${KAFKA_TOPIC_NAME} --partitions 2 --replication-factor 1 --if-not-exists --bootstrap-server kafka0:29092'"
