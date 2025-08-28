@@ -13,7 +13,7 @@ type (
 	}
 	cache interface {
 		Get(orderUID string) *domain.Order
-		Add(order *domain.Order)
+		Put(order *domain.Order)
 	}
 
 	Usecase struct {
@@ -35,7 +35,7 @@ func (u *Usecase) AddOrder(ctx context.Context, order domain.Order) error {
 		return fmt.Errorf("repo.AddOrder: %v", err)
 	}
 
-	u.cache.Add(&order)
+	u.cache.Put(&order)
 
 	return nil
 }

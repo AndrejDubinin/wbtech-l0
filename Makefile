@@ -29,4 +29,5 @@ install-goose:
 
 .PHONY: run-all
 run-all:
-	@DB_CONN=postgres://${POSTGRES_USER}:${POSTGRES_PASSWORD}@localhost:${POSTGRES_HOST_PORT}/${POSTGRES_DB} go run ./cmd/app
+	@DB_CONN=postgres://${POSTGRES_USER}:${POSTGRES_PASSWORD}@localhost:${POSTGRES_HOST_PORT}/${POSTGRES_DB} \
+	CACHE_CAPACITY=100 go run ./cmd/app

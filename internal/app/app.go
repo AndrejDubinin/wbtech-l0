@@ -26,7 +26,7 @@ type (
 	}
 	orderCache interface {
 		Get(orderUID string) *domain.Order
-		Add(order *domain.Order)
+		Put(order *domain.Order)
 	}
 
 	App struct {
@@ -62,7 +62,7 @@ func NewApp(config config) (*App, error) {
 		consumer: cons,
 		db:       db,
 		storage:  order.NewRepository(db),
-		cache:    memoryorder.New(),
+		cache:    memoryorder.New(config.cacheCapacity),
 	}, nil
 }
 

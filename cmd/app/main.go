@@ -16,6 +16,6 @@ func main() {
 
 	err = app.Run()
 	if err != nil {
-		log.Fatalf("error starting app: %s\n", err)
+		log.Fatalf("{FATAL} error starting app: %s\n", err)
 	}
 }
