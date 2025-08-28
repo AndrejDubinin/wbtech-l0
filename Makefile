@@ -26,3 +26,7 @@ compose-rs: ## remove previously and start new local env
 .PHONY: install-goose
 install-goose:
 	GOBIN=${BIN_DIR} go install github.com/pressly/goose/v3/cmd/goose@latest
+
+.PHONY: run-all
+run-all:
+	@DB_CONN=postgres://${POSTGRES_USER}:${POSTGRES_PASSWORD}@localhost:${POSTGRES_HOST_PORT}/${POSTGRES_DB} go run ./cmd/app

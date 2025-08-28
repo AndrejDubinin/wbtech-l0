@@ -2,7 +2,7 @@ package consumer
 
 import (
 	"context"
-	"fmt"
+	"log"
 	"sync"
 	"time"
 
@@ -10,14 +10,20 @@ import (
 	"github.com/IBM/sarama"
 )
 
-type Config struct {
-	Topic string
-}
+type (
+	Config struct {
+		Topic string
+	}
 
-type Consumer struct {
-	config   Config
-	consumer sarama.Consumer
-}
+	Handler interface {
+		ServeMsg(context.Context, *sarama.ConsumerMessage)
+	}
+
+	Consumer struct {
+		config   Config
+		consumer sarama.Consumer
+	}
+)
 
 func NewConsumer(kafkaConfig kafka.Config, conf Config, opts ...Option) (*Consumer, error) {
 	config := sarama.NewConfig()
@@ -46,7 +52,7 @@ func (c *Consumer) Close() error {
 	return c.consumer.Close()
 }
 
-func (c *Consumer) ConsumeTopic(ctx context.Context, handler func(*sarama.ConsumerMessage), wg *sync.WaitGroup) error {
+func (c *Consumer) ConsumeTopic(ctx context.Context, handler Handler, wg *sync.WaitGroup) error {
 	partitionList, err := c.consumer.Partitions(c.config.Topic)
 	if err != nil {
 		return err
@@ -66,14 +72,14 @@ func (c *Consumer) ConsumeTopic(ctx context.Context, handler func(*sarama.Consum
 			for {
 				select {
 				case <-ctx.Done():
-					fmt.Printf("consumer for topic=%s, partition=%d terminated\n", c.config.Topic, partition)
+					log.Printf("consumer for topic=%s, partition=%d terminated\n", c.config.Topic, partition)
 					return
 				case msg, ok := <-pc.Messages():
 					if !ok {
-						fmt.Println("consumer mag channel closed")
+						log.Println("consumer mag channel closed")
 						return
 					}
-					handler(msg)
+					handler.ServeMsg(ctx, msg)
 				}
 			}
 		}(pc, partition)

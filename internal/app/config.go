@@ -7,12 +7,13 @@ import (
 
 type (
 	Options struct {
-		KafkaBrokerAddr, KafkaTopicName string
+		KafkaBrokerAddr, KafkaTopicName, DbConnStr string
 	}
 
 	config struct {
-		kafka    kafka.Config
-		consumer consumer.Config
+		kafka     kafka.Config
+		consumer  consumer.Config
+		dbConnStr string
 	}
 )
 
@@ -26,5 +27,6 @@ func NewConfig(opts Options) config {
 		consumer: consumer.Config{
 			Topic: opts.KafkaTopicName,
 		},
+		dbConnStr: opts.DbConnStr,
 	}
 }
