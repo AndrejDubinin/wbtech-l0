@@ -8,6 +8,7 @@ import (
 
 	appConsumer "github.com/AndrejDubinin/wbtech-l0/internal/app/consumer"
 	"github.com/AndrejDubinin/wbtech-l0/internal/domain"
+	memoryorder "github.com/AndrejDubinin/wbtech-l0/internal/infra/cache/memory_order"
 	"github.com/AndrejDubinin/wbtech-l0/internal/infra/kafka/consumer"
 	"github.com/AndrejDubinin/wbtech-l0/internal/infra/repository/order"
 	consumerMw "github.com/AndrejDubinin/wbtech-l0/internal/middleware/consumer"
@@ -23,12 +24,17 @@ type (
 	orderStorage interface {
 		AddOrder(ctx context.Context, order domain.Order) error
 	}
+	orderCache interface {
+		Get(orderUID string) *domain.Order
+		Add(order *domain.Order)
+	}
 
 	App struct {
 		config   config
 		consumer cons
 		db       *pgxpool.Pool
 		storage  orderStorage
+		cache    orderCache
 	}
 )
 
@@ -56,6 +62,7 @@ func NewApp(config config) (*App, error) {
 		consumer: cons,
 		db:       db,
 		storage:  order.NewRepository(db),
+		cache:    memoryorder.New(),
 	}, nil
 }
 
@@ -65,11 +72,7 @@ func (a *App) Run() error {
 		ctx = context.Background()
 	)
 
-	consumerHandler := appConsumer.NewHandler(add.New(a.storage))
-	consumerHandler = consumerMw.Panic(consumerHandler)
-
-	log.Printf("consumer reads topic: %s\n", a.config.consumer.Topic)
-	err := a.consumer.ConsumeTopic(ctx, consumerHandler, wg)
+	err := a.runConsumer(ctx, wg)
 	if err != nil {
 		return err
 	}
@@ -82,5 +85,18 @@ func (a *App) Run() error {
 func (a *App) Close() error {
 	a.consumer.Close()
 	a.db.Close()
+	return nil
+}
+
+func (a *App) runConsumer(ctx context.Context, wg *sync.WaitGroup) error {
+	consumerHandler := appConsumer.NewHandler(add.New(a.storage, a.cache))
+	consumerHandler = consumerMw.Panic(consumerHandler)
+
+	log.Printf("consumer reads topic: %s\n", a.config.consumer.Topic)
+	err := a.consumer.ConsumeTopic(ctx, consumerHandler, wg)
+	if err != nil {
+		return err
+	}
+
 	return nil
 }

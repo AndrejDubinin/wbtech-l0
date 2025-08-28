@@ -11,15 +11,21 @@ type (
 	repository interface {
 		AddOrder(ctx context.Context, order domain.Order) error
 	}
+	cache interface {
+		Get(orderUID string) *domain.Order
+		Add(order *domain.Order)
+	}
 
 	Usecase struct {
-		repo repository
+		repo  repository
+		cache cache
 	}
 )
 
-func New(repo repository) *Usecase {
+func New(repo repository, cache cache) *Usecase {
 	return &Usecase{
-		repo: repo,
+		repo:  repo,
+		cache: cache,
 	}
 }
 
@@ -28,5 +34,8 @@ func (u *Usecase) AddOrder(ctx context.Context, order domain.Order) error {
 	if err != nil {
 		return fmt.Errorf("repo.AddOrder: %v", err)
 	}
+
+	u.cache.Add(&order)
+
 	return nil
 }
