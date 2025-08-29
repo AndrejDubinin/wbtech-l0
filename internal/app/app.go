@@ -12,6 +12,7 @@ import (
 	"github.com/AndrejDubinin/wbtech-l0/internal/infra/kafka/consumer"
 	"github.com/AndrejDubinin/wbtech-l0/internal/infra/repository/order"
 	consumerMw "github.com/AndrejDubinin/wbtech-l0/internal/middleware/consumer"
+	"github.com/AndrejDubinin/wbtech-l0/internal/usecase/cache/preload"
 	"github.com/AndrejDubinin/wbtech-l0/internal/usecase/order/add"
 	"github.com/jackc/pgx/v5/pgxpool"
 )
@@ -23,6 +24,7 @@ type (
 	}
 	orderStorage interface {
 		AddOrder(ctx context.Context, order domain.Order) error
+		GetOrders(ctx context.Context, amount int64) ([]*domain.Order, error)
 	}
 	orderCache interface {
 		Get(orderUID string) *domain.Order
@@ -72,8 +74,13 @@ func (a *App) Run() error {
 		ctx = context.Background()
 	)
 
-	err := a.runConsumer(ctx, wg)
-	if err != nil {
+	cachPreloader := preload.New(a.config.cacheCapacity, a.storage, a.cache)
+	log.Println("cash preloding")
+	if err := cachPreloader.Preload(ctx); err != nil {
+		return err
+	}
+
+	if err := a.runConsumer(ctx, wg); err != nil {
 		return err
 	}
 

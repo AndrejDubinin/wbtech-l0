@@ -12,7 +12,6 @@ type (
 		AddOrder(ctx context.Context, order domain.Order) error
 	}
 	cache interface {
-		Get(orderUID string) *domain.Order
 		Put(order *domain.Order)
 	}
 
