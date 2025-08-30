@@ -13,6 +13,7 @@ import (
 const (
 	defaultKafkaBrokerAddr = "localhost:9092"
 	defaultKafkaTopicName  = "wbtech-l0-topic"
+	defaultAddr            = "localhost:8081"
 
 	dbConnStr     = "DB_CONN"
 	cacheCapacity = "CACHE_CAPACITY"
@@ -23,6 +24,7 @@ var opts = app.Options{}
 func initOpts() {
 	flag.StringVar(&opts.KafkaBrokerAddr, "broker_addr", defaultKafkaBrokerAddr, fmt.Sprintf("kafka broker host and port, default: %q", defaultKafkaBrokerAddr))
 	flag.StringVar(&opts.KafkaTopicName, "topic_name", defaultKafkaTopicName, fmt.Sprintf("kafka topic's name, default: %q", defaultKafkaTopicName))
+	flag.StringVar(&opts.Addr, "addr", defaultAddr, fmt.Sprintf("server address, default: %q", defaultAddr))
 	flag.Parse()
 
 	opts.DBConnStr = os.Getenv(dbConnStr)

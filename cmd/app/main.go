@@ -7,6 +7,8 @@ import (
 )
 
 func main() {
+	// TODO: add logger
+	// TODO: add graceful shutdown
 	initOpts()
 	app, err := app.NewApp(app.NewConfig(opts))
 	if err != nil {

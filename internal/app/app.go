@@ -2,18 +2,24 @@ package app
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"log"
+	"net/http"
 	"sync"
+	"time"
 
 	appConsumer "github.com/AndrejDubinin/wbtech-l0/internal/app/consumer"
+	appHttp "github.com/AndrejDubinin/wbtech-l0/internal/app/http"
 	"github.com/AndrejDubinin/wbtech-l0/internal/domain"
 	memoryorder "github.com/AndrejDubinin/wbtech-l0/internal/infra/cache/memory_order"
 	"github.com/AndrejDubinin/wbtech-l0/internal/infra/kafka/consumer"
 	"github.com/AndrejDubinin/wbtech-l0/internal/infra/repository/order"
 	consumerMw "github.com/AndrejDubinin/wbtech-l0/internal/middleware/consumer"
+	httpMw "github.com/AndrejDubinin/wbtech-l0/internal/middleware/http"
 	"github.com/AndrejDubinin/wbtech-l0/internal/usecase/cache/preload"
 	"github.com/AndrejDubinin/wbtech-l0/internal/usecase/order/add"
+	"github.com/AndrejDubinin/wbtech-l0/internal/usecase/order/get"
 	"github.com/jackc/pgx/v5/pgxpool"
 )
 
@@ -25,10 +31,18 @@ type (
 	orderStorage interface {
 		AddOrder(ctx context.Context, order domain.Order) error
 		GetOrders(ctx context.Context, amount int64) ([]*domain.Order, error)
+		GetOrder(ctx context.Context, orderUID string) (*domain.Order, error)
 	}
 	orderCache interface {
 		Get(orderUID string) *domain.Order
 		Put(order *domain.Order)
+	}
+	server interface {
+		ListenAndServe() error
+		Close() error
+	}
+	mux interface {
+		Handle(pattern string, handler http.Handler)
 	}
 
 	App struct {
@@ -37,6 +51,8 @@ type (
 		db       *pgxpool.Pool
 		storage  orderStorage
 		cache    orderCache
+		server   server
+		mux      mux
 	}
 )
 
@@ -59,12 +75,23 @@ func NewApp(config config) (*App, error) {
 		return nil, err
 	}
 
+	mux := http.NewServeMux()
+	handler := httpMw.AccessLogMiddleware(mux)
+	handler = httpMw.PanicMiddleware(handler)
+
 	return &App{
 		config:   config,
 		consumer: cons,
 		db:       db,
 		storage:  order.NewRepository(db),
 		cache:    memoryorder.New(config.cacheCapacity),
+		mux:      mux,
+		server: &http.Server{
+			Addr:         config.addr,
+			Handler:      handler,
+			ReadTimeout:  10 * time.Second,
+			WriteTimeout: 10 * time.Second,
+		},
 	}, nil
 }
 
@@ -84,12 +111,24 @@ func (a *App) Run() error {
 		return err
 	}
 
+	go func() {
+		log.Printf("Starting server on %s\n", a.config.addr)
+		err := a.ListenAndServe()
+		if errors.Is(err, http.ErrServerClosed) {
+			log.Fatal("server closed\n")
+		}
+		if err != nil {
+			log.Fatalf("error starting server: %s\n", err)
+		}
+	}()
+
 	wg.Wait()
 
 	return nil
 }
 
 func (a *App) Close() error {
+	a.server.Close()
 	a.consumer.Close()
 	a.db.Close()
 	return nil
@@ -106,4 +145,11 @@ func (a *App) runConsumer(ctx context.Context, wg *sync.WaitGroup) error {
 	}
 
 	return nil
+}
+
+func (a *App) ListenAndServe() error {
+	a.mux.Handle(a.config.path.index, appHttp.NewIndexHandler())
+	a.mux.Handle(a.config.path.orderItemGet, appHttp.NewGetOrderHandler(get.New(a.storage, a.cache), a.config.path.orderItemGet))
+
+	return a.server.ListenAndServe()
 }

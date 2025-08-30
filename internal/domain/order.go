@@ -1,9 +1,14 @@
 package domain
 
-import "time"
+import (
+	"errors"
+	"time"
+)
+
+var ErrOrderNotFound = errors.New("order not found")
 
 type Order struct {
-	OrderUID          string    `json:"order_uid" validate:"required"`
+	OrderUID          string    `json:"order_uid" validate:"required,min=8,max=64"`
 	TrackNumber       string    `json:"track_number" validate:"required"`
 	Entry             string    `json:"entry" validate:"required"`
 	Delivery          Delivery  `json:"delivery" validate:"required"`
