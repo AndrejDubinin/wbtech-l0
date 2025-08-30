@@ -41,6 +41,7 @@ type (
 	server interface {
 		ListenAndServe() error
 		Close() error
+		Shutdown(ctx context.Context) error
 	}
 	mux interface {
 		Handle(pattern string, handler http.Handler)
@@ -57,7 +58,7 @@ type (
 	}
 )
 
-func NewApp(config config) (*App, error) {
+func NewApp(ctx context.Context, config config) (*App, error) {
 	cons, err := consumer.NewConsumer(config.kafka, config.consumer,
 		consumer.WithReturnErrorsEnabled(true),
 	)
@@ -65,7 +66,6 @@ func NewApp(config config) (*App, error) {
 		return nil, err
 	}
 
-	ctx := context.Background()
 	db, err := pgxpool.New(ctx, config.dbConnStr)
 	if err != nil {
 		log.Fatal(fmt.Errorf("failed to connect to db: %w", err))
@@ -96,14 +96,12 @@ func NewApp(config config) (*App, error) {
 	}, nil
 }
 
-func (a *App) Run() error {
-	var (
-		wg  = &sync.WaitGroup{}
-		ctx = context.Background()
-	)
+func (a *App) Run(ctx context.Context) error {
+	wg := &sync.WaitGroup{}
 
 	defer func() {
-		if err := a.Close(); err != nil {
+		log.Println("closing resources:")
+		if err := a.Close(ctx); err != nil {
 			log.Printf("app.Close: %v", err)
 		}
 	}()
@@ -121,10 +119,7 @@ func (a *App) Run() error {
 	go func() {
 		log.Printf("Starting server on %s\n", a.config.addr)
 		err := a.ListenAndServe()
-		if errors.Is(err, http.ErrServerClosed) {
-			log.Fatal("server closed\n")
-		}
-		if err != nil {
+		if err != nil && !errors.Is(err, http.ErrServerClosed) {
 			log.Fatalf("error starting server: %s\n", err)
 		}
 	}()
@@ -134,14 +129,32 @@ func (a *App) Run() error {
 	return nil
 }
 
-func (a *App) Close() error {
-	if err := a.server.Close(); err != nil {
-		return fmt.Errorf("server.Close: %w", err)
+func (a *App) Close(ctx context.Context) error {
+	var errs []error
+
+	log.Println("- shutting down server...")
+	ctx, cancel := context.WithTimeout(ctx, 5*time.Second)
+	defer cancel()
+
+	if err := a.server.Shutdown(ctx); err != nil {
+		log.Printf("server.Shutdown error: %v", err)
+		errs = append(errs, fmt.Errorf("server.Shutdown: %w", err))
 	}
+
+	log.Println("- closing consumer...")
 	if err := a.consumer.Close(); err != nil {
-		return fmt.Errorf("consumer.Close: %w", err)
+		log.Printf("consumer.Close error: %v", err)
+		errs = append(errs, fmt.Errorf("consumer.Close: %w", err))
 	}
+
+	log.Println("- closing database pool...")
 	a.db.Close()
+
+	if len(errs) > 0 {
+		return fmt.Errorf("errors during shutdown: %v", errs)
+	}
+
+	log.Println("all resources closed successfully")
 	return nil
 }
 
