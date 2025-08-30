@@ -3,10 +3,10 @@ package consumer
 import (
 	"context"
 	"encoding/json"
-	"log"
 
 	"github.com/IBM/sarama"
 	"github.com/go-playground/validator/v10"
+	"go.uber.org/zap"
 
 	"github.com/AndrejDubinin/wbtech-l0/internal/domain"
 )
@@ -15,18 +15,24 @@ type (
 	addOrderUsecase interface {
 		AddOrder(ctx context.Context, order domain.Order) error
 	}
+	logger interface {
+		Info(msg string, fields ...zap.Field)
+		Error(msg string, fields ...zap.Field)
+	}
 
 	Handler struct {
 		validate        *validator.Validate
 		ServeMsgFn      func(context.Context, *sarama.ConsumerMessage)
 		addOrderUsecase addOrderUsecase
+		logger          logger
 	}
 )
 
-func NewHandler(usecase addOrderUsecase) *Handler {
+func NewHandler(usecase addOrderUsecase, logger logger) *Handler {
 	handler := &Handler{
 		validate:        validator.New(validator.WithRequiredStructEnabled()),
 		addOrderUsecase: usecase,
+		logger:          logger,
 	}
 	handler.ServeMsgFn = handler.serveMsg
 
@@ -40,17 +46,17 @@ func (h *Handler) ServeMsg(ctx context.Context, s *sarama.ConsumerMessage) {
 func (h *Handler) serveMsg(ctx context.Context, s *sarama.ConsumerMessage) {
 	order := domain.Order{}
 	if err := json.Unmarshal(s.Value, &order); err != nil {
-		log.Printf("consumer.handler decode message: %v", err)
+		h.logger.Error("json.unmarshal", zap.Error(err))
 		return
 	}
 
 	if err := h.validate.Struct(order); err != nil {
-		log.Printf("consumer.handler validation: %v", err)
+		h.logger.Error("validation", zap.Error(err))
 		return
 	}
 
 	err := h.addOrderUsecase.AddOrder(ctx, order)
 	if err != nil {
-		log.Printf("consumer.handler usecase: %v", err)
+		h.logger.Error("usecase", zap.Error(err))
 	}
 }

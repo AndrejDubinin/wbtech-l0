@@ -110,4 +110,4 @@ lint: install-golangci-lint
 .PHONY: run-all
 run-all:
 	@DB_CONN=postgres://${POSTGRES_USER}:${POSTGRES_PASSWORD}@localhost:${POSTGRES_HOST_PORT}/${POSTGRES_DB} \
-	CACHE_CAPACITY=100 go run ./cmd/app
+	CACHE_CAPACITY=100 go run ./cmd/app | jq -c 'del(.ts) | del(.stacktrace)'

@@ -1,16 +1,16 @@
 package http
 
 import (
-	"log"
 	"net/http"
+
+	"go.uber.org/zap"
 )
 
-func PanicMiddleware(next http.Handler) http.Handler {
+func PanicMiddleware(next http.Handler, logger logger) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		log.Println("PanicMiddleware", r.URL.Path)
 		defer func() {
 			if err := recover(); err != nil {
-				log.Println("recovered", err)
+				logger.Error("panic recovered", zap.Any("error", err))
 				http.Error(w, "Internal server error", http.StatusInternalServerError)
 			}
 		}()

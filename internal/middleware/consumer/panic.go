@@ -2,19 +2,30 @@ package consumer
 
 import (
 	"context"
-	"log"
 
 	"github.com/IBM/sarama"
+	"go.uber.org/zap"
 
 	"github.com/AndrejDubinin/wbtech-l0/internal/app/consumer"
 )
 
-func Panic(next *consumer.Handler) *consumer.Handler {
+type (
+	logger interface {
+		Info(msg string, fields ...zap.Field)
+		Error(msg string, fields ...zap.Field)
+	}
+)
+
+func Panic(next *consumer.Handler, logger logger) *consumer.Handler {
 	return &consumer.Handler{
 		ServeMsgFn: func(ctx context.Context, msg *sarama.ConsumerMessage) {
 			defer func() {
 				if r := recover(); r != nil {
-					log.Printf("panic recovered in consumer: %v (topic=%s, partition=%d, offset=%d)", r, msg.Topic, msg.Partition, msg.Offset)
+					logger.Error("panic recovered in consumer",
+						zap.Any("error", r),
+						zap.String("topic", msg.Topic),
+						zap.Int32("partition", msg.Partition),
+						zap.Int64("offset", msg.Offset))
 				}
 			}()
 			next.ServeMsgFn(ctx, msg)

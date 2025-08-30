@@ -7,25 +7,40 @@ import (
 	"os/signal"
 	"syscall"
 
+	"go.uber.org/zap"
+
 	"github.com/AndrejDubinin/wbtech-l0/internal/app"
 )
 
 func main() {
-	// TODO: add logger
-	ctx := runSignalHandler(context.Background())
-
-	initOpts()
-	app, err := app.NewApp(ctx, app.NewConfig(opts))
+	cfg := zap.NewProductionConfig()
+	cfg.OutputPaths = []string{"stdout"}
+	cfg.ErrorOutputPaths = []string{"stderr"}
+	logger, err := cfg.Build()
 	if err != nil {
 		log.Fatal("{FATAL} ", err)
 	}
+	defer func() {
+		log.Println("logger sync...")
+		if err := logger.Sync(); err != nil {
+			log.Println("logger.Sync:", err)
+		}
+	}()
+
+	ctx := runSignalHandler(context.Background(), logger)
+
+	initOpts()
+	app, err := app.NewApp(ctx, app.NewConfig(opts), logger)
+	if err != nil {
+		logger.Fatal("{FATAL} ", zap.Error(err))
+	}
 
 	if err := app.Run(ctx); err != nil {
-		log.Fatal("{FATAL} error starting app", err)
+		logger.Fatal("{FATAL} error starting app", zap.Error(err))
 	}
 }
 
-func runSignalHandler(ctx context.Context) context.Context {
+func runSignalHandler(ctx context.Context, logger *zap.Logger) context.Context {
 	sigterm := make(chan os.Signal, 1)
 	signal.Notify(sigterm, syscall.SIGINT, syscall.SIGTERM)
 
@@ -39,19 +54,19 @@ func runSignalHandler(ctx context.Context) context.Context {
 			select {
 			case sig, ok := <-sigterm:
 				if !ok {
-					log.Printf("[signal] signal chan closed: %s\n", sig.String())
+					logger.Info("[signal] signal chan closed", zap.String("signal", sig.String()))
 					return
 				}
 
-				log.Printf("[signal] signal recv: %s\n", sig.String())
+				logger.Info("[signal] signal recv", zap.String("signal", sig.String()))
 				return
 			case _, ok := <-sigCtx.Done():
 				if !ok {
-					log.Println("[signal] context closed")
+					logger.Info("[signal] context closed")
 					return
 				}
 
-				log.Printf("[signal] ctx done: %s\n", ctx.Err().Error())
+				logger.Error("[signal] ctx done", zap.Error(ctx.Err()))
 				return
 			}
 		}

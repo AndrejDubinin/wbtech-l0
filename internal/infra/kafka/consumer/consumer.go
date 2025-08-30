@@ -2,11 +2,11 @@ package consumer
 
 import (
 	"context"
-	"log"
 	"sync"
 	"time"
 
 	"github.com/IBM/sarama"
+	"go.uber.org/zap"
 
 	"github.com/AndrejDubinin/wbtech-l0/internal/infra/kafka"
 )
@@ -15,24 +15,28 @@ type (
 	Config struct {
 		Topic string
 	}
-
 	Handler interface {
 		ServeMsg(context.Context, *sarama.ConsumerMessage)
+	}
+	logger interface {
+		Info(msg string, fields ...zap.Field)
+		Error(msg string, fields ...zap.Field)
 	}
 
 	Consumer struct {
 		config   Config
 		consumer sarama.Consumer
+		logger   logger
 	}
 )
 
-func NewConsumer(kafkaConfig kafka.Config, conf Config, opts ...Option) (*Consumer, error) {
+func NewConsumer(kafkaConfig kafka.Config, conf Config, logger logger, opts ...Option) (*Consumer, error) {
 	config := sarama.NewConfig()
 
 	config.Consumer.Return.Errors = false
 	config.Consumer.Offsets.AutoCommit.Enable = true
 	config.Consumer.Offsets.AutoCommit.Interval = 5 * time.Second
-	config.Consumer.Offsets.Initial = sarama.OffsetOldest
+	config.Consumer.Offsets.Initial = sarama.OffsetNewest
 
 	for _, opt := range opts {
 		err := opt.Apply(config)
@@ -49,6 +53,7 @@ func NewConsumer(kafkaConfig kafka.Config, conf Config, opts ...Option) (*Consum
 	return &Consumer{
 		consumer: consumer,
 		config:   conf,
+		logger:   logger,
 	}, err
 }
 
@@ -62,7 +67,7 @@ func (c *Consumer) ConsumeTopic(ctx context.Context, handler Handler, wg *sync.W
 		return err
 	}
 
-	initialOffset := sarama.OffsetOldest
+	initialOffset := sarama.OffsetNewest
 
 	for _, partition := range partitionList {
 		pc, err := c.consumer.ConsumePartition(c.config.Topic, partition, initialOffset)
@@ -76,11 +81,13 @@ func (c *Consumer) ConsumeTopic(ctx context.Context, handler Handler, wg *sync.W
 			for {
 				select {
 				case <-ctx.Done():
-					log.Printf("consumer for topic=%s, partition=%d terminated\n", c.config.Topic, partition)
+					c.logger.Info("consumer terminated",
+						zap.String("topic", c.config.Topic),
+						zap.Int32("partition", partition))
 					return
 				case msg, ok := <-pc.Messages():
 					if !ok {
-						log.Println("consumer mag channel closed")
+						c.logger.Info("consumer mag channel closed")
 						return
 					}
 					handler.ServeMsg(ctx, msg)

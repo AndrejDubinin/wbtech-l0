@@ -4,9 +4,10 @@ import (
 	"context"
 	"encoding/json"
 	"errors"
-	"log"
 	"net/http"
 	"regexp"
+
+	"go.uber.org/zap"
 
 	"github.com/AndrejDubinin/wbtech-l0/internal/app/definitions"
 	"github.com/AndrejDubinin/wbtech-l0/internal/domain"
@@ -16,10 +17,15 @@ type (
 	getOrderUsecase interface {
 		GetOrder(ctx context.Context, orderUID string) (*domain.Order, error)
 	}
+	logger interface {
+		Info(msg string, fields ...zap.Field)
+		Error(msg string, fields ...zap.Field)
+	}
 
 	GetOrderHandler struct {
 		name            string
 		getOrderUsecase getOrderUsecase
+		logger          logger
 	}
 )
 
@@ -29,10 +35,11 @@ var (
 	ErrInternalServerError = errors.New("internal server error")
 )
 
-func NewGetOrderHandler(usecase getOrderUsecase, name string) *GetOrderHandler {
+func NewGetOrderHandler(usecase getOrderUsecase, name string, logger logger) *GetOrderHandler {
 	return &GetOrderHandler{
 		name:            name,
 		getOrderUsecase: usecase,
+		logger:          logger,
 	}
 }
 
@@ -47,19 +54,18 @@ func (h *GetOrderHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	order, err := h.getOrderUsecase.GetOrder(ctx, orderUID)
 	if err != nil {
 		if errors.Is(err, domain.ErrOrderNotFound) {
-			// TODO: add place like "const op = app.http.GetOrderHandler" to log
-			log.Printf("order not found, orderUID: %s\n", orderUID)
+			h.logger.Error("order not found", zap.String("orderUID", orderUID))
 			GetErrorResponse(w, http.StatusNotFound, err, "")
 			return
 		}
-		log.Printf("getOrderUsecase.GetOrder: %v\n", err)
+		h.logger.Error("getOrderUsecase.GetOrder", zap.Error(err))
 		GetErrorResponse(w, http.StatusInternalServerError, ErrInternalServerError, "")
 		return
 	}
 
 	response, err := json.Marshal(order)
 	if err != nil {
-		log.Printf("get order json.Marshal: %v\n", err)
+		h.logger.Error("json.Marshal", zap.Error(err))
 		GetErrorResponse(w, http.StatusInternalServerError, ErrInternalServerError, "")
 		return
 	}

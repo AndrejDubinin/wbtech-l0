@@ -4,12 +4,12 @@ import (
 	"context"
 	"errors"
 	"fmt"
-	"log"
 	"net/http"
 	"sync"
 	"time"
 
 	"github.com/jackc/pgx/v5/pgxpool"
+	"go.uber.org/zap"
 
 	appConsumer "github.com/AndrejDubinin/wbtech-l0/internal/app/consumer"
 	appHttp "github.com/AndrejDubinin/wbtech-l0/internal/app/http"
@@ -46,6 +46,13 @@ type (
 	mux interface {
 		Handle(pattern string, handler http.Handler)
 	}
+	logger interface {
+		Info(msg string, fields ...zap.Field)
+		Warn(msg string, fields ...zap.Field)
+		Error(msg string, fields ...zap.Field)
+		Fatal(msg string, fields ...zap.Field)
+		Sync() error
+	}
 
 	App struct {
 		config   config
@@ -55,11 +62,12 @@ type (
 		cache    orderCache
 		server   server
 		mux      mux
+		logger   logger
 	}
 )
 
-func NewApp(ctx context.Context, config config) (*App, error) {
-	cons, err := consumer.NewConsumer(config.kafka, config.consumer,
+func NewApp(ctx context.Context, config config, logger *zap.Logger) (*App, error) {
+	cons, err := consumer.NewConsumer(config.kafka, config.consumer, logger,
 		consumer.WithReturnErrorsEnabled(true),
 	)
 	if err != nil {
@@ -68,7 +76,7 @@ func NewApp(ctx context.Context, config config) (*App, error) {
 
 	db, err := pgxpool.New(ctx, config.dbConnStr)
 	if err != nil {
-		log.Fatal(fmt.Errorf("failed to connect to db: %w", err))
+		logger.Fatal("connection to db", zap.Error(err))
 	}
 
 	err = db.Ping(ctx)
@@ -77,8 +85,8 @@ func NewApp(ctx context.Context, config config) (*App, error) {
 	}
 
 	mux := http.NewServeMux()
-	handler := httpMw.AccessLogMiddleware(mux)
-	handler = httpMw.PanicMiddleware(handler)
+	handler := httpMw.AccessLogMiddleware(mux, logger)
+	handler = httpMw.PanicMiddleware(handler, logger)
 
 	return &App{
 		config:   config,
@@ -93,6 +101,7 @@ func NewApp(ctx context.Context, config config) (*App, error) {
 			ReadTimeout:  10 * time.Second,
 			WriteTimeout: 10 * time.Second,
 		},
+		logger: logger,
 	}, nil
 }
 
@@ -100,14 +109,13 @@ func (a *App) Run(ctx context.Context) error {
 	wg := &sync.WaitGroup{}
 
 	defer func() {
-		log.Println("closing resources:")
 		if err := a.Close(ctx); err != nil {
-			log.Printf("app.Close: %v", err)
+			a.logger.Error("app.Close", zap.Error(err))
 		}
 	}()
 
 	cachPreloader := preload.New(a.config.cacheCapacity, a.storage, a.cache)
-	log.Println("cash preloding")
+	a.logger.Info("cash preloding")
 	if err := cachPreloader.Preload(ctx); err != nil {
 		return err
 	}
@@ -117,10 +125,10 @@ func (a *App) Run(ctx context.Context) error {
 	}
 
 	go func() {
-		log.Printf("Starting server on %s\n", a.config.addr)
+		a.logger.Info("Starting server", zap.String("url", a.config.addr))
 		err := a.ListenAndServe()
 		if err != nil && !errors.Is(err, http.ErrServerClosed) {
-			log.Fatalf("error starting server: %s\n", err)
+			a.logger.Fatal("starting server", zap.Error(err))
 		}
 	}()
 
@@ -132,37 +140,35 @@ func (a *App) Run(ctx context.Context) error {
 func (a *App) Close(ctx context.Context) error {
 	var errs []error
 
-	log.Println("- shutting down server...")
+	a.logger.Info("shutting down server")
 	ctx, cancel := context.WithTimeout(ctx, 5*time.Second)
 	defer cancel()
 
 	if err := a.server.Shutdown(ctx); err != nil {
-		log.Printf("server.Shutdown error: %v", err)
 		errs = append(errs, fmt.Errorf("server.Shutdown: %w", err))
 	}
 
-	log.Println("- closing consumer...")
+	a.logger.Info("closing consumer")
 	if err := a.consumer.Close(); err != nil {
-		log.Printf("consumer.Close error: %v", err)
 		errs = append(errs, fmt.Errorf("consumer.Close: %w", err))
 	}
 
-	log.Println("- closing database pool...")
+	a.logger.Info("closing database pool")
 	a.db.Close()
 
 	if len(errs) > 0 {
 		return fmt.Errorf("errors during shutdown: %v", errs)
 	}
 
-	log.Println("all resources closed successfully")
+	a.logger.Info("all resources closed successfully")
 	return nil
 }
 
 func (a *App) runConsumer(ctx context.Context, wg *sync.WaitGroup) error {
-	consumerHandler := appConsumer.NewHandler(add.New(a.storage, a.cache))
-	consumerHandler = consumerMw.Panic(consumerHandler)
+	consumerHandler := appConsumer.NewHandler(add.New(a.storage, a.cache), a.logger)
+	consumerHandler = consumerMw.Panic(consumerHandler, a.logger)
 
-	log.Printf("consumer reads topic: %s\n", a.config.consumer.Topic)
+	a.logger.Info("consumer reads topic", zap.String("topic", a.config.consumer.Topic))
 	err := a.consumer.ConsumeTopic(ctx, consumerHandler, wg)
 	if err != nil {
 		return err
@@ -173,7 +179,8 @@ func (a *App) runConsumer(ctx context.Context, wg *sync.WaitGroup) error {
 
 func (a *App) ListenAndServe() error {
 	a.mux.Handle(a.config.path.index, appHttp.NewIndexHandler())
-	a.mux.Handle(a.config.path.orderItemGet, appHttp.NewGetOrderHandler(get.New(a.storage, a.cache), a.config.path.orderItemGet))
+	a.mux.Handle(a.config.path.orderItemGet, appHttp.NewGetOrderHandler(get.New(a.storage, a.cache),
+		a.config.path.orderItemGet, a.logger))
 
 	return a.server.ListenAndServe()
 }
