@@ -9,15 +9,14 @@ import (
 func main() {
 	// TODO: add logger
 	// TODO: add graceful shutdown
+	// TODO: add one context
 	initOpts()
 	app, err := app.NewApp(app.NewConfig(opts))
 	if err != nil {
 		log.Fatal("{FATAL} ", err)
 	}
-	defer app.Close()
 
-	err = app.Run()
-	if err != nil {
-		log.Fatalf("{FATAL} error starting app: %s\n", err)
+	if err := app.Run(); err != nil {
+		log.Fatal("{FATAL} error starting app", err)
 	}
 }

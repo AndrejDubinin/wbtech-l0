@@ -5,9 +5,10 @@ import (
 	"encoding/json"
 	"log"
 
-	"github.com/AndrejDubinin/wbtech-l0/internal/domain"
 	"github.com/IBM/sarama"
 	"github.com/go-playground/validator/v10"
+
+	"github.com/AndrejDubinin/wbtech-l0/internal/domain"
 )
 
 type (

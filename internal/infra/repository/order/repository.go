@@ -7,9 +7,10 @@ import (
 	"log"
 	"strings"
 
-	"github.com/AndrejDubinin/wbtech-l0/internal/domain"
 	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgxpool"
+
+	"github.com/AndrejDubinin/wbtech-l0/internal/domain"
 )
 
 type Repository struct {
@@ -165,40 +166,9 @@ func (r *Repository) GetOrders(ctx context.Context, amount int64) ([]*domain.Ord
 	}
 	defer rows.Close()
 
-	ordersMap := make(map[string]*domain.Order)
-
-	for rows.Next() {
-		var order domain.Order
-		var delivery domain.Delivery
-		var payment domain.Payment
-		var item domain.Item
-
-		err := rows.Scan(
-			&order.OrderUID, &order.TrackNumber, &order.Entry, &order.Locale, &order.InternalSignature,
-			&order.CustomerID, &order.DeliveryService, &order.ShardKey, &order.SmID,
-			&order.DateCreated, &order.OofShard,
-			&delivery.Name, &delivery.Phone, &delivery.Zip, &delivery.City, &delivery.Address,
-			&delivery.Region, &delivery.Email,
-			&payment.Transaction, &payment.RequestID, &payment.Currency, &payment.Provider,
-			&payment.Amount, &payment.PaymentDT, &payment.Bank, &payment.DeliveryCost,
-			&payment.GoodsTotal, &payment.CustomFee,
-			&item.ChrtID, &item.TrackNumber, &item.Price, &item.RID, &item.Name, &item.Sale,
-			&item.Size, &item.TotalPrice, &item.NmID, &item.Brand, &item.Status,
-		)
-		if err != nil {
-			return nil, err
-		}
-
-		o, inMap := ordersMap[order.OrderUID]
-		if !inMap {
-			order.Delivery = delivery
-			order.Payment = payment
-			order.Items = []domain.Item{}
-			ordersMap[order.OrderUID] = &order
-			o = &order
-		}
-
-		o.Items = append(o.Items, item)
+	ordersMap, err := scanOrderRows(rows)
+	if err != nil {
+		return []*domain.Order{}, err
 	}
 
 	orders := make([]*domain.Order, 0, len(ordersMap))
@@ -235,6 +205,22 @@ func (r *Repository) GetOrder(ctx context.Context, orderUID string) (*domain.Ord
 	defer rows.Close()
 
 	var orderResult *domain.Order
+	var inMap bool
+
+	ordersMap, err := scanOrderRows(rows)
+	if err != nil {
+		return nil, err
+	}
+
+	if orderResult, inMap = ordersMap[orderUID]; !inMap {
+		return nil, nil
+	}
+
+	return orderResult, nil
+}
+
+func scanOrderRows(rows pgx.Rows) (map[string]*domain.Order, error) {
+	ordersMap := make(map[string]*domain.Order)
 
 	for rows.Next() {
 		var order domain.Order
@@ -258,15 +244,17 @@ func (r *Repository) GetOrder(ctx context.Context, orderUID string) (*domain.Ord
 			return nil, err
 		}
 
-		if orderResult == nil {
+		o, inMap := ordersMap[order.OrderUID]
+		if !inMap {
 			order.Delivery = delivery
 			order.Payment = payment
 			order.Items = []domain.Item{}
-			orderResult = &order
+			ordersMap[order.OrderUID] = &order
+			o = &order
 		}
 
-		orderResult.Items = append(orderResult.Items, item)
+		o.Items = append(o.Items, item)
 	}
 
-	return orderResult, nil
+	return ordersMap, nil
 }

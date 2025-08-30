@@ -9,6 +9,8 @@ import (
 	"sync"
 	"time"
 
+	"github.com/jackc/pgx/v5/pgxpool"
+
 	appConsumer "github.com/AndrejDubinin/wbtech-l0/internal/app/consumer"
 	appHttp "github.com/AndrejDubinin/wbtech-l0/internal/app/http"
 	"github.com/AndrejDubinin/wbtech-l0/internal/domain"
@@ -20,7 +22,6 @@ import (
 	"github.com/AndrejDubinin/wbtech-l0/internal/usecase/cache/preload"
 	"github.com/AndrejDubinin/wbtech-l0/internal/usecase/order/add"
 	"github.com/AndrejDubinin/wbtech-l0/internal/usecase/order/get"
-	"github.com/jackc/pgx/v5/pgxpool"
 )
 
 type (
@@ -101,6 +102,12 @@ func (a *App) Run() error {
 		ctx = context.Background()
 	)
 
+	defer func() {
+		if err := a.Close(); err != nil {
+			log.Printf("app.Close: %v", err)
+		}
+	}()
+
 	cachPreloader := preload.New(a.config.cacheCapacity, a.storage, a.cache)
 	log.Println("cash preloding")
 	if err := cachPreloader.Preload(ctx); err != nil {
@@ -128,8 +135,12 @@ func (a *App) Run() error {
 }
 
 func (a *App) Close() error {
-	a.server.Close()
-	a.consumer.Close()
+	if err := a.server.Close(); err != nil {
+		return fmt.Errorf("server.Close: %w", err)
+	}
+	if err := a.consumer.Close(); err != nil {
+		return fmt.Errorf("consumer.Close: %w", err)
+	}
 	a.db.Close()
 	return nil
 }

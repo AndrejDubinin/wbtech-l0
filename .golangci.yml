@@ -1,0 +1,102 @@
+version: "2" # Config format version (v2 for golangci-lint 2.x)
+
+run: # Linter execution settings
+  timeout: 5m # Max analysis time
+  relative-path-mode: gomod # Paths relative to module root
+  issues-exit-code: 1 # Exit code = 1 if issues found (for CI)
+  tests: true # Include _test.go files
+  modules-download-mode: readonly # Disallow dependency downloads during analysis
+
+output: # Output settings
+  formats:
+    text: # Terminal output
+      print-linter-name: true # Show linter name
+      print-issued-lines: true # Show code line with issue
+      colors: true # Use colored output
+
+issues: # Issue handling
+  max-issues-per-linter: 0 # No per-linter limit
+  max-same-issues: 0 # No limit on duplicate issues
+  uniq-by-line: true # Show at most one issue per line
+
+linters: # Linters configuration
+  default: standard # Standard golangci-lint set
+  enable: # Additional linters
+    - errcheck # Check for unchecked errors
+    - staticcheck # Advanced static analysis
+    - govet # Go vet checks
+    - gocritic # Code quality improvements
+    - revive # Style and naming checks
+    - unused # Detect unused vars, funcs, types
+    - gosec # Security checks
+    - depguard # Restrict disallowed imports
+    - bodyclose # Ensure resp.Body is closed
+    - asciicheck # Warn on non-ASCII chars
+    - cyclop # Cyclomatic complexity checks
+    - dupl # Detect duplicated code
+    - ineffassign # Detect ineffectual assignments
+    - unparam # Detect unused function params
+    - errorlint # Enforce errors.Is / errors.As
+    - errname # Error vars/types should contain "Err"
+    - forbidigo # Restrict specific calls by regex
+    - contextcheck # Ensure context.Context is passed
+    - containedctx # Warn if context.Context stored in struct
+  disable: # Disabled linters
+    - gocyclo # Old complexity checker (replaced by cyclop)
+    - lll # Line length checker (too noisy)
+
+  exclusions: # Exclusions
+    generated: strict # Ignore generated files
+    rules:
+      - path: _test\.go # For test files:
+        linters:
+          - cyclop # Skip complexity checks
+          - dupl # Skip duplication checks
+          - gosec # Skip security checks
+
+  settings: # Per-linter settings
+    gosec:
+      config:
+        global:
+          audit: true # Enable all security rules
+          show-ignored: true # Show ignored issues
+        severity: "medium" # Min severity: high/medium/low
+        confidence: "medium" # Min confidence: high/medium/low
+
+    cyclop:
+      max-complexity: 20 # Max function complexity
+
+    depguard:
+      rules:
+        main:
+          deny:
+            - pkg: io/ioutil # Deprecated package
+              desc: "io/ioutil is deprecated; use os/io instead"
+
+    revive:
+      severity: warning # Report as warnings, not errors
+
+    forbidigo:
+      exclude-godoc-examples: true # Ignore godoc examples
+      analyze-types: true # Also check types/constants
+      forbid:
+        - pattern: '^fmt\.Print.*$'
+          msg: "Do not use fmt.Print* for logging; use a structured logger"
+        - pattern: '^time\.Sleep$'
+          msg: "Do not use time.Sleep in production; use timers/context"
+        - pattern: '^http\.DefaultClient$'
+          msg: "Do not use http.DefaultClient; create *http.Client with timeouts"
+
+formatters: # Code formatters
+  enable:
+    - gofumpt # Stricter gofmt
+    - gci # Import formatter
+  settings:
+    gofumpt:
+      extra-rules: true # Enable strict formatting
+    gci:
+      sections: # Import grouping
+        - Standard # Standard library
+        - Default # Third-party packages
+        - Prefix(github.com/AndrejDubinin/wbtech-l0) # Local imports
+      no-inline-comments: false # Allow inline comments after imports

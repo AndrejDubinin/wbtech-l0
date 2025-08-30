@@ -4,8 +4,9 @@ import (
 	"context"
 	"log"
 
-	"github.com/AndrejDubinin/wbtech-l0/internal/app/consumer"
 	"github.com/IBM/sarama"
+
+	"github.com/AndrejDubinin/wbtech-l0/internal/app/consumer"
 )
 
 func Panic(next *consumer.Handler) *consumer.Handler {

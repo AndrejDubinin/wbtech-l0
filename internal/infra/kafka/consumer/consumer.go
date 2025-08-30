@@ -6,8 +6,9 @@ import (
 	"sync"
 	"time"
 
-	"github.com/AndrejDubinin/wbtech-l0/internal/infra/kafka"
 	"github.com/IBM/sarama"
+
+	"github.com/AndrejDubinin/wbtech-l0/internal/infra/kafka"
 )
 
 type (
@@ -34,7 +35,10 @@ func NewConsumer(kafkaConfig kafka.Config, conf Config, opts ...Option) (*Consum
 	config.Consumer.Offsets.Initial = sarama.OffsetOldest
 
 	for _, opt := range opts {
-		_ = opt.Apply(config)
+		err := opt.Apply(config)
+		if err != nil {
+			return nil, err
+		}
 	}
 
 	consumer, err := sarama.NewConsumer(kafkaConfig.Brokers, config)

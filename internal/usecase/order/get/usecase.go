@@ -36,7 +36,7 @@ func (u *Usecase) GetOrder(ctx context.Context, orderUID string) (*domain.Order,
 
 	order, err := u.repo.GetOrder(ctx, orderUID)
 	if err != nil {
-		return nil, fmt.Errorf("repo.GetOrder: %v", err)
+		return nil, fmt.Errorf("repo.GetOrder: %w", err)
 	}
 	if order == nil {
 		return nil, domain.ErrOrderNotFound

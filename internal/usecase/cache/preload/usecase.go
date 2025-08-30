@@ -33,7 +33,7 @@ func New(capacity int64, repo repository, cache cache) *CachePreloader {
 func (c *CachePreloader) Preload(ctx context.Context) error {
 	orders, err := c.repo.GetOrders(ctx, c.capacity)
 	if err != nil {
-		return fmt.Errorf("repo.GetOrders: %v", err)
+		return fmt.Errorf("repo.GetOrders: %w", err)
 	}
 
 	for _, order := range orders {

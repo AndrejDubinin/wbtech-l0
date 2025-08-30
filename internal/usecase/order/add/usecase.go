@@ -31,7 +31,7 @@ func New(repo repository, cache cache) *Usecase {
 func (u *Usecase) AddOrder(ctx context.Context, order domain.Order) error {
 	err := u.repo.AddOrder(ctx, order)
 	if err != nil {
-		return fmt.Errorf("repo.AddOrder: %v", err)
+		return fmt.Errorf("repo.AddOrder: %w", err)
 	}
 
 	u.cache.Put(&order)
