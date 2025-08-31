@@ -54,7 +54,7 @@ func (h *GetOrderHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	order, err := h.getOrderUsecase.GetOrder(ctx, orderUID)
 	if err != nil {
 		if errors.Is(err, domain.ErrOrderNotFound) {
-			h.logger.Error("order not found", zap.String("orderUID", orderUID))
+			h.logger.Info("order not found", zap.String("orderUID", orderUID))
 			GetErrorResponse(w, http.StatusNotFound, err, "")
 			return
 		}

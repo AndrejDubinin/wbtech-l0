@@ -125,7 +125,7 @@ func (a *App) Run(ctx context.Context) error {
 	}
 
 	go func() {
-		a.logger.Info("Starting server", zap.String("url", a.config.addr))
+		a.logger.Info("Starting server", zap.String("address", a.config.addr))
 		err := a.ListenAndServe()
 		if err != nil && !errors.Is(err, http.ErrServerClosed) {
 			a.logger.Fatal("starting server", zap.Error(err))

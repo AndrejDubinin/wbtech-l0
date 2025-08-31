@@ -2,6 +2,7 @@ package consumer
 
 import (
 	"context"
+	"slices"
 	"sync"
 	"time"
 
@@ -43,6 +44,12 @@ func NewConsumer(kafkaConfig kafka.Config, conf Config, logger logger, opts ...O
 		if err != nil {
 			return nil, err
 		}
+	}
+
+	ctx, cancel := context.WithTimeout(context.Background(), 1*time.Minute)
+	defer cancel()
+	if err := waitForTopic(ctx, kafkaConfig.Brokers, conf.Topic, logger); err != nil {
+		return nil, err
 	}
 
 	consumer, err := sarama.NewConsumer(kafkaConfig.Brokers, config)
@@ -97,4 +104,37 @@ func (c *Consumer) ConsumeTopic(ctx context.Context, handler Handler, wg *sync.W
 	}
 
 	return nil
+}
+
+func waitForTopic(ctx context.Context, brokers []string, topic string, logger logger) error {
+	ticker := time.NewTicker(5 * time.Second)
+	defer ticker.Stop()
+
+	for {
+		select {
+		case <-ctx.Done():
+			return ctx.Err()
+		case <-ticker.C:
+			config := sarama.NewConfig()
+			client, err := sarama.NewClient(brokers, config)
+			if err != nil {
+				logger.Error("kafka not ready", zap.Error(err))
+				continue
+			}
+
+			topics, err := client.Topics()
+			client.Close()
+			if err != nil {
+				logger.Error("failed to list topics", zap.Error(err))
+				continue
+			}
+
+			if slices.Contains(topics, topic) {
+				logger.Info("topic exists", zap.String("topic", topic))
+				return nil
+			}
+
+			logger.Info("topic not found, retrying...", zap.String("topic", topic))
+		}
+	}
 }

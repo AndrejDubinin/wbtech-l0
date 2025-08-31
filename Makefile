@@ -29,7 +29,7 @@ MIGRATE_DIR		= $(CURDIR)/migrations
 
 .PHONY: compose-up
 compose-up:
-	docker-compose -p ${ENV_NAME} -f ${DOCKER_YML} up #-d
+	docker-compose -p ${ENV_NAME} -f ${DOCKER_YML} up -d
 
 .PHONY: compose-down
 compose-down: ## terminate local env
@@ -43,6 +43,10 @@ compose-rm: ## remove local env
 compose-rs: ## remove previously and start new local env
 	make compose-rm
 	make compose-up
+
+.PHONY: compose-app
+compose-app:
+	docker-compose -p ${ENV_NAME} -f ${DOCKER_YML} build order-app
 
 
 # ======================================================

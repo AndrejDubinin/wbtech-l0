@@ -16,6 +16,7 @@ func main() {
 	cfg := zap.NewProductionConfig()
 	cfg.OutputPaths = []string{"stdout"}
 	cfg.ErrorOutputPaths = []string{"stderr"}
+	cfg.Level = zap.NewAtomicLevelAt(zap.InfoLevel)
 	logger, err := cfg.Build()
 	if err != nil {
 		log.Fatal("{FATAL} ", err)
@@ -32,7 +33,7 @@ func main() {
 	initOpts()
 	app, err := app.NewApp(ctx, app.NewConfig(opts), logger)
 	if err != nil {
-		logger.Fatal("{FATAL} ", zap.Error(err))
+		logger.Fatal("{FATAL}", zap.Error(err))
 	}
 
 	if err := app.Run(ctx); err != nil {
