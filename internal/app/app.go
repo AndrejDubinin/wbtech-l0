@@ -67,7 +67,7 @@ type (
 )
 
 func NewApp(ctx context.Context, config config, logger *zap.Logger) (*App, error) {
-	cons, err := consumer.NewConsumer(config.kafka, config.consumer, logger,
+	cons, err := consumer.NewConsumer(ctx, config.kafka, config.consumer, logger,
 		consumer.WithReturnErrorsEnabled(true),
 	)
 	if err != nil {

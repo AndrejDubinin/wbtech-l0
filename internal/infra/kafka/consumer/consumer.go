@@ -31,7 +31,7 @@ type (
 	}
 )
 
-func NewConsumer(kafkaConfig kafka.Config, conf Config, logger logger, opts ...Option) (*Consumer, error) {
+func NewConsumer(ctx context.Context, kafkaConfig kafka.Config, conf Config, logger logger, opts ...Option) (*Consumer, error) {
 	config := sarama.NewConfig()
 
 	config.Consumer.Return.Errors = false
@@ -46,9 +46,9 @@ func NewConsumer(kafkaConfig kafka.Config, conf Config, logger logger, opts ...O
 		}
 	}
 
-	ctx, cancel := context.WithTimeout(context.Background(), 1*time.Minute)
+	ctxTopic, cancel := context.WithTimeout(ctx, 1*time.Minute)
 	defer cancel()
-	if err := waitForTopic(ctx, kafkaConfig.Brokers, conf.Topic, logger); err != nil {
+	if err := waitForTopic(ctxTopic, kafkaConfig.Brokers, conf.Topic, logger); err != nil {
 		return nil, err
 	}
 
@@ -123,9 +123,11 @@ func waitForTopic(ctx context.Context, brokers []string, topic string, logger lo
 			}
 
 			topics, err := client.Topics()
-			client.Close()
+			if err := client.Close(); err != nil {
+				logger.Error("sarama client close", zap.Error(err))
+			}
 			if err != nil {
-				logger.Error("failed to list topics", zap.Error(err))
+				logger.Error("list topics", zap.Error(err))
 				continue
 			}
 
