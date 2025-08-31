@@ -1,0 +1,33 @@
+<!doctype html>
+<html>
+	<head>
+		<meta charset="utf-8" />
+		<title>Order Lookup</title>
+		<link rel="stylesheet" href="css/style.css" />
+	</head>
+	<body>
+		<div class="container">
+			<h1>Order Lookup</h1>
+			<input id="orderId" placeholder="Enter Order ID" />
+			<button onclick="getOrder()">Get Order</button>
+
+			<pre id="result"></pre>
+		</div>
+
+		<script>
+			async function getOrder() {
+				const id = document.getElementById("orderId").value;
+				if (!id) return;
+
+				const res = await fetch(`${window.location.origin}/order/${id}`);
+				console.log(res);
+				const data = await res.json();
+				document.getElementById("result").textContent = JSON.stringify(
+					data,
+					null,
+					2,
+				);
+			}
+		</script>
+	</body>
+</html>

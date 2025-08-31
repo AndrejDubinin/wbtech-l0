@@ -1,0 +1,77 @@
+* {
+	box-sizing: border-box;
+	margin: 0;
+	padding: 0;
+}
+
+body {
+	font-family: "Segoe UI", Tahoma, Geneva, Verdana, sans-serif;
+	background: #f9f9f9;
+	display: flex;
+	justify-content: center;
+	align-items: center;
+	min-height: 100vh;
+}
+
+.container {
+	background-color: #ffffff;
+	padding: 40px 30px;
+	border-radius: 16px;
+	box-shadow: 0 10px 25px rgba(0, 0, 0, 0.1);
+	width: 500px;
+	max-width: 90%;
+	text-align: center;
+}
+
+h1 {
+	font-size: 28px;
+	color: #000;
+	margin-bottom: 25px;
+}
+
+input#orderId {
+	width: 100%;
+	padding: 12px 15px;
+	margin-bottom: 20px;
+	border-radius: 8px;
+	border: 1px solid #ccc;
+	font-size: 16px;
+	transition: all 0.2s;
+}
+
+input#orderId:focus {
+	border-color: #007bff;
+	box-shadow: 0 0 8px rgba(0, 123, 255, 0.2);
+	outline: none;
+}
+
+button {
+	width: 100%;
+	padding: 12px 0;
+	background-color: transparent;
+	color: #000;
+	font-size: 18px;
+	border: 2px solid #b3b3b3;
+	border-radius: 8px;
+	cursor: pointer;
+	transition: all 0.2s;
+}
+
+button:hover {
+	background-color: rgba(0, 0, 0, 0.05);
+	transform: translateY(-2px);
+	box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
+}
+pre#result {
+	margin-top: 25px;
+	background-color: #f1f5f9;
+	padding: 20px;
+	border-radius: 12px;
+	font-size: 14px;
+	color: #333;
+	text-align: left;
+	overflow-y: auto;
+	white-space: pre-wrap;
+	word-wrap: break-word;
+	transition: all 0.2s;
+}
