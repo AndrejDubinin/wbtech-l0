@@ -29,7 +29,7 @@ MIGRATE_DIR		= $(CURDIR)/migrations
 
 .PHONY: compose-up
 compose-up:
-	docker-compose -p ${ENV_NAME} -f ${DOCKER_YML} up #-d
+	docker-compose -p ${ENV_NAME} -f ${DOCKER_YML} up -d
 
 .PHONY: compose-down
 compose-down: ## terminate local env

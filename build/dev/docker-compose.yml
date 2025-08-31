@@ -112,3 +112,14 @@ services:
         condition: service_healthy
       kafka0:
         condition: service_healthy
+
+  nginx:
+    image: nginx:latest
+    container_name: wbtech-l0-nginx
+    ports:
+      - ${FRONTEND_HOST_PORT}:8080
+    volumes:
+      - ./frontend/nginx.conf:/etc/nginx/conf.d/default.conf
+      - ./../../static/frontend:/usr/share/nginx/html
+    depends_on:
+      - order-app
