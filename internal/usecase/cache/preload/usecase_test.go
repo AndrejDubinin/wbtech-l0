@@ -52,8 +52,6 @@ func TestPreloadCache(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			t.Parallel()
-
 			ctx := context.Background()
 
 			repoMock.GetOrdersMock.Expect(ctx, cacheSize).Return(tt.orders, tt.wantErr)
@@ -62,7 +60,11 @@ func TestPreloadCache(t *testing.T) {
 			}
 
 			err := cachePreloadUsecase.Preload(ctx)
-			require.ErrorIs(t, err, tt.wantErr)
+			if tt.wantErr != nil {
+				require.ErrorIs(t, err, tt.wantErr)
+			} else {
+				require.NoError(t, err)
+			}
 		})
 	}
 }

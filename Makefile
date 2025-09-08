@@ -132,6 +132,10 @@ generate-mocks: install-minimock
 	@echo "Generating mocks..."
 	@$(MINIMOCK) -i ./internal/usecase/cache/preload.repository -o ./internal/usecase/cache/preload/repository_mock_test.go
 	@$(MINIMOCK) -i ./internal/usecase/cache/preload.cache -o ./internal/usecase/cache/preload/cache_mock_test.go
+	@$(MINIMOCK) -i ./internal/usecase/order/add.repository -o ./internal/usecase/order/add/repository_mock_test.go
+	@$(MINIMOCK) -i ./internal/usecase/order/add.cache -o ./internal/usecase/order/add/cache_mock_test.go
+	@$(MINIMOCK) -i ./internal/usecase/order/get.repository -o ./internal/usecase/order/get/repository_mock_test.go
+	@$(MINIMOCK) -i ./internal/usecase/order/get.cache -o ./internal/usecase/order/get/cache_mock_test.go
 
 .PHONY: test
 test:
