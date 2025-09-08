@@ -12,6 +12,7 @@ GOLANGCI_LINT		= $(BIN_DIR)/golangci-lint
 GCI							= $(BIN_DIR)/gci
 GOFUMPT					= $(BIN_DIR)/gofumpt
 GOOSE						= $(BIN_DIR)/goose
+MINIMOCK				= $(BIN_DIR)/minimock
 
 DOCKER_DIR		= $(CURDIR)/build/dev
 DOCKER_YML		= $(DOCKER_DIR)/docker-compose.yml
@@ -115,3 +116,31 @@ lint: install-golangci-lint
 run-all:
 	@DB_CONN=postgres://${POSTGRES_USER}:${POSTGRES_PASSWORD}@localhost:${POSTGRES_HOST_PORT}/${POSTGRES_DB} \
 	CACHE_CAPACITY=100 go run ./cmd/app | jq -c 'del(.ts) | del(.stacktrace)'
+
+
+# ======================================================
+# Test
+# ======================================================
+
+.PHONY: install-minimock
+install-minimock:
+	@echo "Installing minimock if missing..."
+	@[ -f $(MINIMOCK) ] || GOBIN=$(BIN_DIR) go install github.com/gojuno/minimock/v3/cmd/minimock@latest
+
+.PHONY: generate-mocks
+generate-mocks: install-minimock
+	@echo "Generating mocks..."
+	@$(MINIMOCK) -i ./internal/usecase/cache/preload.repository -o ./internal/usecase/cache/preload/repository_mock_test.go
+	@$(MINIMOCK) -i ./internal/usecase/cache/preload.cache -o ./internal/usecase/cache/preload/cache_mock_test.go
+
+.PHONY: test
+test:
+	@echo "Testing..."
+	@go test -v -count=1 ./...
+
+.PHONY: test-cover
+test-cover:
+	@echo "Generating cover files..."
+	@go test -short -count=1 -coverprofile=coverage.out ./...
+	@go tool cover -html=coverage.out
+	@rm coverage.out
